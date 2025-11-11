@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>AR - Marcador Customizado</title>
+
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ar.js"></script>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html, body {
+        width: 100%;
+        height: 100%;
+        font-family: Arial, sans-serif;
+      }
+      
+      body {
+        background: #000;
+        color: #0f0;
+        overflow: hidden;
+      }
+
+      a-scene {
+        width: 100%;
+        height: 100%;
+      }
+
+      #status {
+        position: fixed;
+        top: 15px;
+        left: 15px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #0f0;
+        border: 2px solid #0f0;
+        padding: 20px;
+        font-family: monospace;
+        font-size: 14px;
+        z-index: 1000;
+        line-height: 1.6;
+        min-width: 280px;
+      }
+
+      .ok { color: #0f0; font-weight: bold; }
+      .erro { color: #f00; font-weight: bold; }
+      .warn { color: #ff0; }
+
+      #detectado {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 200, 0, 0.9);
+        color: #fff;
+        padding: 40px 80px;
+        font-size: 36px;
+        font-weight: bold;
+        border: 4px solid #0f0;
+        border-radius: 20px;
+        z-index: 999;
+        display: none;
+        text-align: center;
+      }
+
+      #detectado.ativo {
+        display: block;
+        animation: pulse 0.5s;
+      }
+
+      @keyframes pulse {
+        0% { transform: translate(-50%, -50%) scale(1); }
+        50% { transform: translate(-50%, -50%) scale(1.1); }
+        100% { transform: translate(-50%, -50%) scale(1); }
+      }
+
+      #instrucoes {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: #0ff;
+        border: 2px solid #0ff;
+        padding: 20px;
+        text-align: center;
+        font-size: 14px;
+        max-width: 90%;
+        z-index: 998;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Status -->
+    <div id="status">
+      <strong>STATUS AR</strong><br>
+      Camara: <span id="cam" class="warn">⟳</span><br>
+      A-Frame: <span id="af" class="warn">⟳</span><br>
+      AR.js: <span id="ar" class="warn">⟳</span><br>
+      Marcador: <span id="marker" class="erro">⟳ Procurando</span><br>
+      <br>
+      <small id="msg">Inicializando...</small>
+    </div>
+
+    <!-- Detectado Alert -->
+    <div id="detectado">
+      ✓ MARCADOR DETECTADO!
+    </div>
+
+    <!-- Instrucoes -->
+    <div id="instrucoes">
+      <strong>Aponte a câmera para o marcador</strong><br>
+      <a href="https://jeromeetienne.github.io/AR.js/data/images/HIRO.jpg" target="_blank">
+        Baixar marcador HIRO
+      </a>
+    </div>
+
+    <!-- Cena AR -->
+    <a-scene
+      embedded
+      arjs="sourceType: webcam; debugUIEnabled: false;"
+      vr-mode-ui="enabled: false"
+    >
+      <a-camera-static></a-camera-static>
+
+      <!-- Marcador HIRO -->
+      <a-marker preset="hiro" emitevents="true">
+        <a-gltf-model
+          src="#model"
+          position="0 0 0"
+          scale="0.5 0.5 0.5"
+          animation="property: rotation; to: 0 360 0; dur: 4000; loop: true"
+        ></a-gltf-model>
+      </a-marker>
+
+      <a-assets>
+        <a-asset-item id="model" src="model1.glb"></a-asset-item>
+      </a-assets>
+    </a-scene>
+
+    <script>
+      console.clear();
+      console.log("=== AR INICIADO ===");
+
+      // Marcar pagina carregada
+      document.getElementById("cam").textContent = "✓";
+      document.getElementById("cam").className = "ok";
+
+      // Esperar A-Frame
+      var checkAFrame = setInterval(() => {
+        if (window.AFRAME) {
+          console.log("✓ A-Frame carregado");
+          document.getElementById("af").textContent = "✓";
+          document.getElementById("af").className = "ok";
+          clearInterval(checkAFrame);
+        }
+      }, 100);
+
+      // Esperar AR.js
+      setTimeout(() => {
+        console.log("✓ AR.js pronto");
+        document.getElementById("ar").textContent = "✓";
+        document.getElementById("ar").className = "ok";
+        document.getElementById("msg").textContent = "Procurando marcador...";
+      }, 2000);
+
+      // Solicitar permissão da câmera
+      setTimeout(() => {
+        navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        }).then(stream => {
+          console.log("✓ Câmera autorizada");
+        }).catch(err => {
+          console.error("Erro câmera:", err);
+          document.getElementById("msg").textContent = "Erro: " + err.message;
+        });
+      }, 500);
+
+      // Evento: Marcador encontrado
+      document.addEventListener("markerFound", (event) => {
+        console.log("⭐ MARCADOR HIRO DETECTADO!");
+        document.getElementById("marker").textContent = "✓ DETECTADO";
+        document.getElementById("marker").className = "ok";
+        document.getElementById("detectado").classList.add("ativo");
+        document.getElementById("msg").textContent = "✓ Modelo aparecendo!";
+      });
+
+      // Evento: Marcador perdido
+      document.addEventListener("markerLost", (event) => {
+        console.log("Marcador perdido");
+        document.getElementById("marker").textContent = "⟳ Procurando";
+        document.getElementById("marker").className = "erro";
+        document.getElementById("detectado").classList.remove("ativo");
+        document.getElementById("msg").textContent = "Procurando marcador...";
+      });
+
+      console.log("Sistema pronto!");
+    </script>
+  </body>
+</html>
