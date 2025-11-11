@@ -73,6 +73,23 @@
         max-width: 90%;
         z-index: 998;
       }
+      /* botão discreto para reproduzir fala se autoplay for bloqueado */
+      #btn-play-fala {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 1001;
+        background: #0a84ff;
+        color: #fff;
+        border: none;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-weight: bold;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        cursor: pointer;
+        display: none; /* mostrado apenas se necessário */
+      }
+      #btn-play-fala:active { transform: translateY(1px); }
     </style>
   </head>
 
@@ -93,6 +110,9 @@
       <a href="pattern-marker.patt" download>Baixar marcador</a>
     </div>
 
+    <!-- Botão de fallback para iniciar a fala caso o navegador bloqueie autoplay -->
+    <button id="btn-play-fala" aria-label="Ouvir fala">Ouvir fala</button>
+
     <!-- ✅ Cena AR configurada corretamente ✅ -->
     <a-scene
       embedded
@@ -111,16 +131,28 @@
         emitevents="true"
         id="meu-marker"
       >
+        <!--
+          `id="modelo-personagem"` -> facilita selecionar o modelo via JS
+          `rotating-when-visible` -> componente custom que gira suavemente quando ativo
+          `character-speech` -> componente custom para tocar áudio e preparar sincronização labial
+        -->
         <a-gltf-model
+          id="modelo-personagem"
           src="#model"
           position="0 0 0"
           scale="0.4 0.4 0.4"
           rotation="0 0 0"
+          rotating-when-visible="speed: 15"
+          character-speech="audioSelector: #fala1"
         ></a-gltf-model>
       </a-marker>
 
       <a-entity camera></a-entity>
     </a-scene>
+
+      <!-- Áudio da personagem (pré-carregado).
+        Coloque o arquivo `fala1.mp3` na mesma pasta do projeto. -->
+      <audio id="fala1" src="fala1.mp3" preload="auto"></audio>
 
     <script>
       console.clear();
@@ -139,21 +171,196 @@
       // ✅ Eventos oficiais de AR.js
       const marker = document.getElementById("meu-marker");
 
-      marker.addEventListener("markerFound", () => {
-        console.log("⭐ Marcador detectado!");
-        document.getElementById("marker").textContent = "✓ DETECTADO";
-        document.getElementById("marker").className = "ok";
-        document.getElementById("detectado").classList.add("ativo");
-        document.getElementById("msg").textContent = "✓ Modelo Carregado!";
+      // Registramos dois componentes customizados abaixo:
+      // 1) rotating-when-visible: roda o modelo no eixo Y enquanto ativo (deg/s)
+      // 2) character-speech: toca um áudio e expõe método para sincronizar boca no futuro
+
+      /* Componente: rotating-when-visible
+         - data.speed: graus por segundo (default 15)
+         - expõe métodos `start()` e `stop()` para controlar rotação externamente
+         - usa tick() para atualização suave baseada em timeDelta (compatível A-Frame 1.2.0)
+      */
+      AFRAME.registerComponent('rotating-when-visible', {
+        schema: { speed: { type: 'number', default: 15 } },
+        init: function () {
+          this.isRotating = false;
+          // start/stop expostos para chamadas externas (ex.: markerFound/markerLost)
+          this.start = () => { this.isRotating = true; };
+          this.stop = () => { this.isRotating = false; };
+        },
+        tick: function (time, timeDelta) {
+          // timeDelta em ms; converte para segundos
+          if (!this.isRotating) return;
+          const rot = this.el.getAttribute('rotation') || { x: 0, y: 0, z: 0 };
+          // incrementa Y de forma suave: speed (deg/s) * dt
+          rot.y = (rot.y + this.data.speed * (timeDelta / 1000)) % 360;
+          this.el.setAttribute('rotation', rot);
+        },
+        remove: function () { this.isRotating = false; }
       });
 
-      marker.addEventListener("markerLost", () => {
-        console.log("Marcador perdido");
-        document.getElementById("marker").textContent = "⟳ Procurando";
-        document.getElementById("marker").className = "erro";
-        document.getElementById("detectado").classList.remove("ativo");
-        document.getElementById("msg").textContent = "Procurando marcador...";
+      /* Componente: character-speech
+         - data.audioSelector: seletor do elemento <audio> (default '#fala1')
+         - fornece método `playSpeech()` para iniciar a fala
+         - fornece método `stopSpeech()` para interromper
+         - expõe `syncMouth()` placeholder para futura sincronização labial
+      */
+      AFRAME.registerComponent('character-speech', {
+        schema: { audioSelector: { type: 'selector', default: '#fala1' } },
+        init: function () {
+          // A-Frame com schema selector já retorna o elemento se existir
+          this.audioEl = this.data.audioSelector || document.querySelector('#fala1');
+          this.isPlaying = false;
+
+          // Handler que será chamado em cada update do áudio para futura sincronização
+          this._onTimeUpdate = (ev) => {
+            // Atualmente chamamos syncMouth como placeholder
+            // TODO: implementar animação labial aqui (usar ev.currentTime para sincronizar)
+            this.syncMouth(ev);
+          };
+
+          if (this.audioEl) {
+            this.audioEl.addEventListener('timeupdate', this._onTimeUpdate);
+          } else {
+            console.warn('[character-speech] áudio não encontrado para selector', this.data.audioSelector);
+          }
+
+          // métodos públicos
+          this.playSpeech = () => {
+            if (!this.audioEl) { console.warn('[character-speech] áudio ausente'); return; }
+            try {
+              // Reinicia e tenta tocar. Note: navegadores podem bloquear autoplay sem interação do usuário.
+              this.audioEl.currentTime = 0;
+              const p = this.audioEl.play();
+              if (p && p.then) {
+                p.then(() => {
+                  this.isPlaying = true;
+                  // Se a reprodução começou com sucesso, garante que o botão de fallback fique oculto
+                  const btn = document.getElementById('btn-play-fala');
+                  if (btn) btn.style.display = 'none';
+                }).catch(err => {
+                  console.warn('play() falhou:', err);
+                  // Mostra um botão para que o usuário permita reprodução manualmente
+                  const btn = document.getElementById('btn-play-fala');
+                  if (btn) btn.style.display = 'block';
+                });
+              } else {
+                this.isPlaying = true;
+              }
+            } catch (e) {
+              console.warn('[character-speech] erro ao tocar áudio', e);
+              const btn = document.getElementById('btn-play-fala');
+              if (btn) btn.style.display = 'block';
+            }
+          };
+
+          this.stopSpeech = () => {
+            if (!this.audioEl) return;
+            this.audioEl.pause();
+            this.audioEl.currentTime = 0;
+            this.isPlaying = false;
+          };
+
+          // Placeholder público para futuras implementações de sincronização labial
+          this.syncMouth = (audioEventOrTime) => {
+            // TODO: usar audioEventOrTime.currentTime ou valor numérico para animar a boca do personagem
+            // Exemplo futuro: extrair volume ou usar WebAudio API para visemes.
+          };
+        },
+        remove: function () {
+          if (this.audioEl) this.audioEl.removeEventListener('timeupdate', this._onTimeUpdate);
+        }
       });
+
+      // Agora usamos os eventos do marcador para ativar/desativar comportamentos
+      marker.addEventListener('markerFound', () => {
+        console.log('⭐ Marcador detectado!');
+        document.getElementById('marker').textContent = '✓ DETECTADO';
+        document.getElementById('marker').className = 'ok';
+        document.getElementById('detectado').classList.add('ativo');
+        document.getElementById('msg').textContent = '✓ Modelo Carregado!';
+
+        // Seleciona o modelo e inicia rotação + fala
+        const modelEl = document.getElementById('modelo-personagem');
+        if (modelEl) {
+          // Se o componente de rotação já estiver inicializado, usa seu método start()
+          const rotComp = modelEl.components['rotating-when-visible'];
+          if (rotComp && rotComp.start) {
+            rotComp.start();
+          } else {
+            // Garante que o componente exista (caso não tenha sido inicializado ainda)
+            modelEl.setAttribute('rotating-when-visible', '');
+            // Tenta novamente após pequeno delay para garantir inicialização
+            setTimeout(() => {
+              const r = modelEl.components['rotating-when-visible'];
+              if (r && r.start) r.start();
+            }, 50);
+          }
+
+          // Inicia a fala pela API exposta no componente character-speech
+          const speechComp = modelEl.components['character-speech'];
+          if (speechComp && speechComp.playSpeech) {
+            speechComp.playSpeech();
+          } else {
+            // Garantir inicialização e chamar em seguida
+            modelEl.setAttribute('character-speech', '');
+            setTimeout(() => {
+              const s = modelEl.components['character-speech'];
+              if (s && s.playSpeech) s.playSpeech();
+            }, 50);
+          }
+        }
+      });
+
+      marker.addEventListener('markerLost', () => {
+        console.log('Marcador perdido');
+        document.getElementById('marker').textContent = '⟳ Procurando';
+        document.getElementById('marker').className = 'erro';
+        document.getElementById('detectado').classList.remove('ativo');
+        document.getElementById('msg').textContent = 'Procurando marcador...';
+
+        // Para rotação e fala quando marcador é perdido
+        const modelEl = document.getElementById('modelo-personagem');
+        if (modelEl) {
+          const rotComp = modelEl.components['rotating-when-visible'];
+          if (rotComp && rotComp.stop) rotComp.stop();
+
+          const speechComp = modelEl.components['character-speech'];
+          if (speechComp && speechComp.stopSpeech) speechComp.stopSpeech();
+        }
+      });
+
+      // --- Fallback UI: botão para tocar fala manualmente (se autoplay bloqueado) ---
+      const btnPlayFala = document.getElementById('btn-play-fala');
+      if (btnPlayFala) {
+        btnPlayFala.addEventListener('click', () => {
+          // Tenta acionar a fala no modelo (se o componente estiver disponível)
+          const modelEl = document.getElementById('modelo-personagem');
+          if (modelEl) {
+            const speechComp = modelEl.components['character-speech'];
+            if (speechComp && speechComp.playSpeech) {
+              speechComp.playSpeech();
+              // Oculta o botão após o clique
+              btnPlayFala.style.display = 'none';
+            } else {
+              // Caso o componente ainda não esteja pronto, inicializa e tenta novamente
+              modelEl.setAttribute('character-speech', '');
+              setTimeout(() => {
+                const s = modelEl.components['character-speech'];
+                if (s && s.playSpeech) s.playSpeech();
+                btnPlayFala.style.display = 'none';
+              }, 100);
+            }
+          } else {
+            // Se não há modelo, tenta tocar o elemento <audio> diretamente como fallback
+            const audio = document.getElementById('fala1');
+            if (audio) {
+              audio.play().catch(err => console.warn('Erro ao tocar áudio diretamente:', err));
+              btnPlayFala.style.display = 'none';
+            }
+          }
+        });
+      }
     </script>
   </body>
 </html>
