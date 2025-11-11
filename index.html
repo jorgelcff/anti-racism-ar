@@ -151,8 +151,8 @@
     </a-scene>
 
       <!-- Áudio da personagem (pré-carregado).
-        Coloque o arquivo `fala1.mp3` na mesma pasta do projeto. -->
-      <audio id="fala1" src="fala1.mp3" preload="auto"></audio>
+        Coloque o arquivo `audio1.m4a` na mesma pasta do projeto. -->
+      <audio id="fala1" src="audio1.m4a" preload="auto"></audio>
 
     <script>
       console.clear();
@@ -280,7 +280,8 @@
         document.getElementById('detectado').classList.add('ativo');
         document.getElementById('msg').textContent = '✓ Modelo Carregado!';
 
-        // Seleciona o modelo e inicia rotação + fala
+        // Seleciona o modelo e inicia rotação.
+        // A fala NÃO será iniciada automaticamente — o usuário deverá pressionar o botão após o retângulo desaparecer.
         const modelEl = document.getElementById('modelo-personagem');
         if (modelEl) {
           // Se o componente de rotação já estiver inicializado, usa seu método start()
@@ -296,20 +297,16 @@
               if (r && r.start) r.start();
             }, 50);
           }
-
-          // Inicia a fala pela API exposta no componente character-speech
-          const speechComp = modelEl.components['character-speech'];
-          if (speechComp && speechComp.playSpeech) {
-            speechComp.playSpeech();
-          } else {
-            // Garantir inicialização e chamar em seguida
-            modelEl.setAttribute('character-speech', '');
-            setTimeout(() => {
-              const s = modelEl.components['character-speech'];
-              if (s && s.playSpeech) s.playSpeech();
-            }, 50);
-          }
         }
+
+        // Após 2 segundos removemos o retângulo verde da tela e mostramos o botão "Ouvir fala"
+        // Isso evita sobreposição visual e segue o pedido do usuário: permitir que o usuário pressione Play
+        setTimeout(() => {
+          const detectEl = document.getElementById('detectado');
+          if (detectEl) detectEl.classList.remove('ativo');
+          const btn = document.getElementById('btn-play-fala');
+          if (btn) btn.style.display = 'block';
+        }, 2000);
       });
 
       marker.addEventListener('markerLost', () => {
@@ -328,6 +325,9 @@
           const speechComp = modelEl.components['character-speech'];
           if (speechComp && speechComp.stopSpeech) speechComp.stopSpeech();
         }
+        // Esconde o botão de play quando o marcador some
+        const btn = document.getElementById('btn-play-fala');
+        if (btn) btn.style.display = 'none';
       });
 
       // --- Fallback UI: botão para tocar fala manualmente (se autoplay bloqueado) ---
