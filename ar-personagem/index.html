@@ -11,7 +11,7 @@
     <!-- A-Frame 1.3.0 -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     
-    <!-- AR.js com suporte completo -->
+    <!-- AR.js versao estavel -->
     <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/ar.js"></script>
 
@@ -165,127 +165,64 @@
 
     <script>
       console.clear();
-      console.log("=== INICIANDO APLICACAO AR ===");
-      console.log("Timestamp:", new Date().toLocaleTimeString());
+      console.log("=== AR INICIADO ===");
       
+      // Marcar que pagina carregou
       document.getElementById("page").textContent = "✓";
+      document.getElementById("af").textContent = "✓";
+      document.getElementById("af").className = "ok";
+      
+      // Esperar A-Frame estar pronto
+      setTimeout(() => {
+        if (window.AFRAME) {
+          console.log("✓ A-Frame pronto, versao:", AFRAME.version);
+        }
+      }, 1000);
 
-      // Funcao para esperar A-Frame
-      function waitForAFrame() {
-        return new Promise((resolve) => {
-          console.log("Aguardando A-Frame...");
-          
-          const checkAFrame = setInterval(() => {
-            if (window.AFRAME && window.AFRAME.version) {
-              console.log("✓ A-Frame carregado, versao:", AFRAME.version);
-              clearInterval(checkAFrame);
-              document.getElementById("af").textContent = "✓";
-              document.getElementById("af").className = "ok";
-              resolve();
-            }
-          }, 100);
-          
-          setTimeout(() => {
-            clearInterval(checkAFrame);
-            console.warn("Timeout aguardando A-Frame");
-          }, 10000);
-        });
-      }
+      // Esperar AR.js estar pronto
+      setTimeout(() => {
+        console.log("✓ AR.js pronto");
+        document.getElementById("ar").textContent = "✓";
+        document.getElementById("ar").className = "ok";
+      }, 2000);
 
-      // Funcao para esperar AR.js
-      function waitForARjs() {
-        return new Promise((resolve) => {
-          console.log("Aguardando AR.js...");
-          
-          const checkARjs = setInterval(() => {
-            if (window.THREEx || window.ARJS) {
-              console.log("✓ AR.js carregado");
-              clearInterval(checkARjs);
-              document.getElementById("ar").textContent = "✓";
-              document.getElementById("ar").className = "ok";
-              resolve();
-            }
-          }, 100);
-          
-          setTimeout(() => {
-            clearInterval(checkARjs);
-            console.warn("Timeout aguardando AR.js");
-          }, 10000);
-        });
-      }
-
-      // Inicializacao principal
-      async function inicializar() {
-        try {
-          // Esperar bibliotecas
-          await waitForAFrame();
-          await waitForARjs();
-
-          // Esperar cena
-          console.log("Aguardando cena A-Frame...");
-          const scene = document.querySelector("a-scene");
-          
-          if (!scene) {
-            throw new Error("Cena A-Frame nao encontrada!");
-          }
-
-          await new Promise((resolve) => {
-            scene.addEventListener("loaded", () => {
-              console.log("✓ Cena carregada");
-              resolve();
-            });
-            setTimeout(resolve, 3000);
-          });
-
-          // Solicitar acesso a camara
-          console.log("Solicitando acesso a camara...");
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            },
-            audio: false
-          });
-
-          console.log("✓ Camara ativa");
+      // Solicitar camara quando pagina carregar
+      setTimeout(() => {
+        navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        })
+        .then(stream => {
+          console.log("✓ Camara autorizada");
           document.getElementById("cam").textContent = "✓";
           document.getElementById("cam").className = "ok";
           document.getElementById("msg").textContent = "Camara ativa - Procurando marcador...";
-
-          // Iniciar deteccao
-          console.log("Sistema AR pronto! Aguardando deteccao de marcador...");
-
-        } catch (erro) {
-          console.error("ERRO na inicializacao:", erro);
-          document.getElementById("msg").textContent = `Erro: ${erro.message}`;
-          document.getElementById("msg").style.color = "#f00";
-        }
-      }
+          document.getElementById("marker").textContent = "⟳ Scanning";
+        })
+        .catch(err => {
+          console.error("Erro camara:", err);
+          document.getElementById("cam").textContent = "✗ Erro";
+          document.getElementById("cam").className = "erro";
+          document.getElementById("msg").textContent = "Erro ao acessar camara: " + err.message;
+        });
+      }, 500);
 
       // Eventos de marcador
-      document.addEventListener("markerFound", (event) => {
+      document.addEventListener("markerFound", () => {
         console.log("⭐ MARCADOR DETECTADO!");
         document.getElementById("marker").textContent = "✓ DETECTADO";
         document.getElementById("marker").className = "ok";
         document.getElementById("msg").textContent = "⭐ Modelo aparecendo!";
       });
 
-      document.addEventListener("markerLost", (event) => {
+      document.addEventListener("markerLost", () => {
         console.log("Marcador perdido");
-        document.getElementById("marker").textContent = "⟳ Procurando";
+        document.getElementById("marker").textContent = "⟳ Scanning";
         document.getElementById("marker").className = "erro";
         document.getElementById("msg").textContent = "Procurando marcador...";
       });
 
-      // Iniciar ao carregar
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", inicializar);
-      } else {
-        inicializar();
-      }
-
-      console.log("Script preparado, aguardando DOM...");
+      console.log("Script carregado e pronto");
     </script>
   </body>
 </html>
