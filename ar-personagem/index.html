@@ -6,72 +6,93 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
-    <title>AR - Câmera Sempre Ativa</title>
+    <title>AR - Marcador Customizado</title>
 
-    <!-- A-Frame -->
+    <!-- A-Frame 1.3.0 -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <!-- AR.js com suporte total -->
-    <script src="https://cdn.jsdelivr.net/npm/ar.js"></script>
+    
+    <!-- AR.js com suporte completo -->
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/ar.js"></script>
 
     <style>
       * {
         margin: 0;
         padding: 0;
+        box-sizing: border-box;
       }
-      body {
+      
+      html, body {
         width: 100%;
-        height: 100vh;
-        font-family: monospace;
+        height: 100%;
+        font-family: Arial, sans-serif;
+      }
+      
+      body {
         background: #000;
         color: #0f0;
         overflow: hidden;
       }
 
-      html,
-      body {
-        width: 100%;
-        height: 100%;
-      }
-
       a-scene {
         width: 100%;
         height: 100%;
-        display: block;
       }
 
       #status {
         position: fixed;
         top: 10px;
         left: 10px;
-        background: rgba(0, 0, 0, 0.95);
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #0f0;
         padding: 15px;
         border-radius: 5px;
         z-index: 999;
-        font-size: 12px;
-        line-height: 1.6;
+        font-size: 13px;
+        line-height: 1.8;
+        font-family: monospace;
+        min-width: 250px;
       }
 
       .ok {
         color: #0f0;
+        font-weight: bold;
       }
+      
       .erro {
         color: #f00;
+        font-weight: bold;
       }
+      
       .warn {
         color: #ff0;
       }
 
       #instrucoes {
         position: fixed;
-        bottom: 30px;
+        bottom: 20px;
         left: 50%;
         transform: translateX(-50%);
         background: rgba(0, 0, 0, 0.95);
+        border: 2px solid #0ff;
         padding: 20px;
         border-radius: 10px;
         text-align: center;
         max-width: 90%;
-        font-size: 13px;
+        font-size: 14px;
+        z-index: 998;
+      }
+
+      #instrucoes strong {
+        color: #0ff;
+        display: block;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      #instrucoes p {
+        margin: 5px 0;
+        color: #0f0;
       }
 
       a {
@@ -81,167 +102,190 @@
     </style>
   </head>
   <body>
+    <!-- Status Display -->
     <div id="status">
-      <strong style="color: #0ff">📱 AR COM CÂMERA ATIVA</strong><br /><br />
-      Página: <span id="page" class="ok">✓</span><br />
+      <div style="color: #0ff; font-weight: bold; margin-bottom: 10px;">
+        === DIAGNOSTICO AR ===
+      </div>
+      Pagina: <span id="page" class="ok">✓</span><br />
       A-Frame: <span id="af" class="warn">⟳</span><br />
       AR.js: <span id="ar" class="warn">⟳</span><br />
-      Câmera: <span id="cam" class="warn">⟳</span><br />
-      Marcador: <span id="marker" class="erro">⟳ scanning</span><br /><br />
-      <small id="msg">Inicializando...</small>
+      Camara: <span id="cam" class="warn">⟳</span><br />
+      Marcador: <span id="marker" class="erro">⟳</span><br />
+      <br />
+      <small id="msg" style="color: #0f0;">Inicializando...</small>
     </div>
 
+    <!-- Instrucoes -->
     <div id="instrucoes">
-      📋 <strong>APONTE PARA O MARCADOR HIRO</strong><br /><br />
-      <a
-        href="https://jeromeetienne.github.io/AR.js/data/images/HIRO.jpg"
-        target="_blank"
-      >
-        👉 Ver marcador HIRO </a
-      ><br />
-      <small>(Imprima em A4 ou exiba na tela)</small>
+      <strong>COMO USAR</strong>
+      <p>1. Imprima seu marcador customizado</p>
+      <p>2. Aponte a camara para o marcador</p>
+      <p>3. Veja o modelo 3D aparecer!</p>
+      <p style="margin-top: 10px; font-size: 12px; color: #ff0;">
+        Se nao funcionar, abra o console (F12) para ver erros
+      </p>
     </div>
 
-    <!-- CENA AR - Simples e direta -->
+    <!-- CENA AR -->
     <a-scene
       embedded
-      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; matrixCodeType: 3x3;"
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono;"
       vr-mode-ui="enabled: false"
-      renderer="logarithmicDepthBuffer: true;"
-      id="arScene"
+      renderer="antialias: true; colorManagement: true;"
     >
-      <a-camera-static></a-camera-static>
+      <!-- Camera -->
+      <a-camera position="0 0 0"></a-camera>
 
-      <!-- Marcador Customizado -->
-      <a-marker type="pattern" url="pattern-marker.patt" emitevents="true">
+      <!-- Marcador com padrão customizado -->
+      <a-marker 
+        type="pattern" 
+        url="pattern-marker.patt"
+        emitevents="true"
+        smooth="true"
+        smoothCount="5"
+      >
         <!-- Modelo GLB -->
         <a-gltf-model
+          id="modelo"
           src="#model-glb"
           position="0 0 0"
-          scale="1 1 1"
-          animation="property: rotation; to: 0 360 0; dur: 4000; loop: true"
+          rotation="0 0 0"
+          scale="0.5 0.5 0.5"
+          animation="property: rotation; to: 0 360 0; dur: 4000; loop: true; easing: linear"
         >
         </a-gltf-model>
       </a-marker>
 
       <!-- Assets -->
-      <a-assets timeout="30000">
+      <a-assets>
         <a-asset-item id="model-glb" src="model1.glb"></a-asset-item>
       </a-assets>
     </a-scene>
 
     <script>
-      console.log("=== INICIANDO AR ===");
+      console.clear();
+      console.log("=== INICIANDO APLICACAO AR ===");
+      console.log("Timestamp:", new Date().toLocaleTimeString());
+      
       document.getElementById("page").textContent = "✓";
 
-      // ===== ESPERAR AFRAME =====
+      // Funcao para esperar A-Frame
       function waitForAFrame() {
         return new Promise((resolve) => {
-          if (window.AFRAME && AFRAME.version) {
-            resolve();
-          } else {
-            const checkInterval = setInterval(() => {
-              if (window.AFRAME && AFRAME.version) {
-                clearInterval(checkInterval);
-                resolve();
-              }
-            }, 100);
-            setTimeout(() => clearInterval(checkInterval), 5000);
-          }
+          console.log("Aguardando A-Frame...");
+          
+          const checkAFrame = setInterval(() => {
+            if (window.AFRAME && window.AFRAME.version) {
+              console.log("✓ A-Frame carregado, versao:", AFRAME.version);
+              clearInterval(checkAFrame);
+              document.getElementById("af").textContent = "✓";
+              document.getElementById("af").className = "ok";
+              resolve();
+            }
+          }, 100);
+          
+          setTimeout(() => {
+            clearInterval(checkAFrame);
+            console.warn("Timeout aguardando A-Frame");
+          }, 10000);
         });
       }
 
-      // ===== ESPERAR AR.JS =====
+      // Funcao para esperar AR.js
       function waitForARjs() {
         return new Promise((resolve) => {
-          if (window.THREEx) {
-            resolve();
-          } else {
-            const checkInterval = setInterval(() => {
-              if (window.THREEx) {
-                clearInterval(checkInterval);
-                resolve();
-              }
-            }, 100);
-            setTimeout(() => clearInterval(checkInterval), 5000);
-          }
+          console.log("Aguardando AR.js...");
+          
+          const checkARjs = setInterval(() => {
+            if (window.THREEx || window.ARJS) {
+              console.log("✓ AR.js carregado");
+              clearInterval(checkARjs);
+              document.getElementById("ar").textContent = "✓";
+              document.getElementById("ar").className = "ok";
+              resolve();
+            }
+          }, 100);
+          
+          setTimeout(() => {
+            clearInterval(checkARjs);
+            console.warn("Timeout aguardando AR.js");
+          }, 10000);
         });
       }
 
-      // ===== INICIALIZAÇÃO =====
-      async function init() {
+      // Inicializacao principal
+      async function inicializar() {
         try {
-          // Esperar A-Frame
-          console.log("Aguardando A-Frame...");
+          // Esperar bibliotecas
           await waitForAFrame();
-          document.getElementById("af").textContent = "✓";
-          document.getElementById("af").className = "ok";
-          console.log("✓ A-Frame carregado:", AFRAME.version);
-
-          // Esperar AR.js
-          console.log("Aguardando AR.js...");
           await waitForARjs();
-          document.getElementById("ar").textContent = "✓";
-          document.getElementById("ar").className = "ok";
-          console.log("✓ AR.js carregado");
 
           // Esperar cena
           console.log("Aguardando cena A-Frame...");
           const scene = document.querySelector("a-scene");
-          if (scene) {
-            await new Promise((resolve) => {
-              scene.addEventListener("loaded", resolve);
-              setTimeout(resolve, 3000);
-            });
-            console.log("✓ Cena carregada");
+          
+          if (!scene) {
+            throw new Error("Cena A-Frame nao encontrada!");
           }
 
-          // Câmera
-          console.log("Solicitando câmera...");
+          await new Promise((resolve) => {
+            scene.addEventListener("loaded", () => {
+              console.log("✓ Cena carregada");
+              resolve();
+            });
+            setTimeout(resolve, 3000);
+          });
+
+          // Solicitar acesso a camara
+          console.log("Solicitando acesso a camara...");
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
               width: { ideal: 1280 },
-              height: { ideal: 720 },
+              height: { ideal: 720 }
             },
+            audio: false
           });
 
+          console.log("✓ Camara ativa");
           document.getElementById("cam").textContent = "✓";
           document.getElementById("cam").className = "ok";
-          console.log("✓ Câmera autorizada e ativa");
-          document.getElementById("msg").textContent =
-            "Câmera ativa - Escaneie HIRO!";
+          document.getElementById("msg").textContent = "Camara ativa - Procurando marcador...";
 
-          // NÃO fechar o stream!
-          // stream.getTracks().forEach(t => t.stop());
-        } catch (error) {
-          console.error("ERRO:", error);
-          document.getElementById("msg").textContent = `Erro: ${error.message}`;
+          // Iniciar deteccao
+          console.log("Sistema AR pronto! Aguardando deteccao de marcador...");
+
+        } catch (erro) {
+          console.error("ERRO na inicializacao:", erro);
+          document.getElementById("msg").textContent = `Erro: ${erro.message}`;
+          document.getElementById("msg").style.color = "#f00";
         }
       }
 
-      // Iniciar após documento carregar
-      document.addEventListener("DOMContentLoaded", init);
-      window.addEventListener("load", () => {
-        console.log("Página totalmente carregada");
-      });
-
-      // ===== EVENTOS DO MARCADOR =====
-      document.addEventListener("markerFound", () => {
-        console.log("⭐ MARCADOR HIRO ENCONTRADO!");
+      // Eventos de marcador
+      document.addEventListener("markerFound", (event) => {
+        console.log("⭐ MARCADOR DETECTADO!");
         document.getElementById("marker").textContent = "✓ DETECTADO";
         document.getElementById("marker").className = "ok";
         document.getElementById("msg").textContent = "⭐ Modelo aparecendo!";
       });
 
-      document.addEventListener("markerLost", () => {
+      document.addEventListener("markerLost", (event) => {
         console.log("Marcador perdido");
-        document.getElementById("marker").textContent = "⟳ scanning";
+        document.getElementById("marker").textContent = "⟳ Procurando";
         document.getElementById("marker").className = "erro";
         document.getElementById("msg").textContent = "Procurando marcador...";
       });
 
-      console.log("Script pronto");
+      // Iniciar ao carregar
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", inicializar);
+      } else {
+        inicializar();
+      }
+
+      console.log("Script preparado, aguardando DOM...");
     </script>
   </body>
 </html>
