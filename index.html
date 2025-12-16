@@ -91,25 +91,38 @@
       }
       #btn-play-fala:active { transform: translateY(1px); }
 
-      /* Painel central com controles principais */
+      /* Painel central como bottom sheet */
       #central-controls {
         position: fixed;
         left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
+        bottom: 10px;
+        transform: translateX(-50%);
         z-index: 1002;
         background: rgba(0,0,0,0.85);
         border: 1px solid #0ff;
         border-radius: 12px;
-        padding: 16px 18px;
+        padding: 10px 12px;
         color: #0ff;
-        width: 90%;
-        max-width: 360px;
+        width: 94%;
+        max-width: 420px;
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        align-items: center;
+        gap: 10px;
+        align-items: stretch;
         text-align: center;
+        max-height: 50vh;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      }
+      #central-controls.expanded { max-height: 70vh; overflow-y: auto; }
+      #central-controls .sheet-handle {
+        width: 36px;
+        height: 4px;
+        background: #0ff;
+        opacity: 0.6;
+        border-radius: 3px;
+        align-self: center;
+        margin: 4px 0 8px;
       }
       #central-controls h4 { margin: 0; }
       #central-controls .row { width: 100%; display: flex; flex-direction: column; gap: 6px; }
@@ -211,6 +224,7 @@
 
     <!-- Painel central com controles: Ouvir fala, Rotação, Escala -->
     <div id="central-controls" aria-label="Controles principais">
+      <div class="sheet-handle" title="Arraste ou toque para expandir"></div>
       <h4>Controles</h4>
       <div class="row">
         <button id="btn-play-fala" aria-label="Ouvir fala">Ouvir fala</button>
@@ -752,6 +766,21 @@
         });
         // Abre o painel inicialmente para facilitar ajustes de escala/rotação
         panel.style.display = 'block';
+      })();
+
+      // --- Bottom sheet: expand/collapse ---
+      (function setupBottomSheet(){
+        const sheet = document.getElementById('central-controls');
+        if (!sheet) return;
+        // começa em estado compacto (não-expanded)
+        sheet.classList.remove('expanded');
+        sheet.addEventListener('click', (ev) => {
+          // se clicar próximo ao handle ou no título, alterna expansão
+          const target = ev.target;
+          if (target.classList && target.classList.contains('sheet-handle')) {
+            sheet.classList.toggle('expanded');
+          }
+        });
       })();
 
       // --- Controles de transformação ---
