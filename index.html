@@ -143,15 +143,13 @@
       AR.js: <span id="ar" class="warn">⟳</span><br>
       Marcador: <span id="marker" class="erro">⟳ Procurando</span><br><br>
       Áudio: <span id="audioState" class="warn">Parado</span><br>
+      Rotação: <button id="btn-stop-rot" style="margin-top:6px;">Parar rotação</button><br>
       <small id="msg">Inicializando...</small>
     </div>
 
     <div id="detectado">✓ MARCADOR DETECTADO!</div>
 
-    <div id="instrucoes">
-      <strong>Aponte a câmera para o marcador</strong><br>
-      <a href="pattern-marker.patt" download>Baixar marcador</a>
-    </div>
+    <!-- Removido bloco de instruções; link do marcador foi movido para o menu (⋮) -->
 
     <!-- Botão de menu (3 pontos) -->
     <div id="menu-btn" title="Opções">⋮</div>
@@ -165,6 +163,7 @@
       <small>Use "Ouvir fala" para iniciar o áudio.</small>
 
       <h4>Transformar Modelo</h4>
+      <label style="display:flex;align-items:center;gap:6px;"> <input id="autoRotate" type="checkbox" checked> Rotação automática </label>
       <label>Escala</label>
       <input id="scaleSlider" type="range" min="0.1" max="2.0" step="0.01" value="0.4">
       <div class="row">
@@ -188,38 +187,8 @@
         </div>
       </div>
 
-      <h4>Motion</h4>
-      <div class="actions">
-        <button id="btn-idle" type="button">Idle</button>
-        <button id="btn-wave" type="button">Acenar</button>
-        <button id="btn-stop-motion" type="button">Parar</button>
-      </div>
-
-      <h4>Mapeamento</h4>
-      <label>Clip Idle</label>
-      <input id="mapClipIdle" type="text" placeholder="Idle">
-      <label>Clip Wave</label>
-      <input id="mapClipWave" type="text" placeholder="Wave">
-      <label>Clip Talk</label>
-      <input id="mapClipTalk" type="text" placeholder="Talk">
-      <div class="row">
-        <div>
-          <label>Bone Jaw</label>
-          <input id="mapBoneJaw" type="text" placeholder="Jaw">
-        </div>
-        <div>
-          <label>Bone RightHand</label>
-          <input id="mapBoneHandR" type="text" placeholder="RightHand">
-        </div>
-      </div>
-      <label>Morph MouthOpen</label>
-      <input id="mapMorphMouthOpen" type="text" placeholder="MouthOpen">
-      <div class="actions">
-        <button id="btn-apply-mapping" type="button">Aplicar Mapeamento</button>
-        <label style="display:flex;align-items:center;gap:6px;">
-          <input id="lipSyncEnabled" type="checkbox"> Lip-sync
-        </label>
-      </div>
+      <h4>Marcador</h4>
+      <a href="pattern-marker.patt" download>Baixar marcador (.patt)</a>
     </div>
 
     <!-- Botão de fallback para iniciar a fala caso o navegador bloqueie autoplay -->
@@ -256,7 +225,6 @@
           rotation="0 0 0"
           rotating-when-visible="speed: 15"
           character-speech="audioSelector: #fala1"
-          character-motion
         ></a-gltf-model>
       </a-marker>
 
@@ -588,36 +556,34 @@
       });
 
       // Agora usamos os eventos do marcador para ativar/desativar comportamentos
+      let markerVisible = false;
+
       marker.addEventListener('markerFound', () => {
         console.log('⭐ Marcador detectado!');
         document.getElementById('marker').textContent = '✓ DETECTADO';
         document.getElementById('marker').className = 'ok';
         document.getElementById('detectado').classList.add('ativo');
         document.getElementById('msg').textContent = '✓ Modelo Carregado!';
-
+        markerVisible = true;
         // Seleciona o modelo e inicia rotação.
         // A fala NÃO será iniciada automaticamente — o usuário deverá pressionar o botão após o retângulo desaparecer.
         const modelEl = document.getElementById('modelo-personagem');
         if (modelEl) {
           // Se o componente de rotação já estiver inicializado, usa seu método start()
           const rotComp = modelEl.components['rotating-when-visible'];
+          const auto = document.getElementById('autoRotate');
+          const shouldStart = !auto || auto.checked; // liga somente se checkbox marcado
           if (rotComp && rotComp.start) {
-            rotComp.start();
+            if (shouldStart) rotComp.start();
           } else {
             // Garante que o componente exista (caso não tenha sido inicializado ainda)
             modelEl.setAttribute('rotating-when-visible', '');
             // Tenta novamente após pequeno delay para garantir inicialização
             setTimeout(() => {
               const r = modelEl.components['rotating-when-visible'];
-              if (r && r.start) r.start();
+              if (r && r.start && shouldStart) r.start();
             }, 50);
           }
-        }
-
-        // Inicia estado Idle (se houver) ao detectar marcador
-        if (modelEl) {
-          const motion = modelEl.components['character-motion'];
-          if (motion && motion.playMotion) motion.playMotion('idle', { loop: true, fade: 0.2 });
         }
 
         // Após 2 segundos removemos o retângulo verde da tela e mostramos o botão "Ouvir fala"
@@ -636,6 +602,7 @@
         document.getElementById('marker').className = 'erro';
         document.getElementById('detectado').classList.remove('ativo');
         document.getElementById('msg').textContent = 'Procurando marcador...';
+        markerVisible = false;
 
         // Para rotação e fala quando marcador é perdido
         const modelEl = document.getElementById('modelo-personagem');
@@ -645,8 +612,6 @@
 
           const speechComp = modelEl.components['character-speech'];
           if (speechComp && speechComp.stopSpeech) speechComp.stopSpeech();
-          const motion = modelEl.components['character-motion'];
-          if (motion && motion.stopAll) motion.stopAll();
         }
         // Esconde o botão de play quando o marcador some
         const btn = document.getElementById('btn-play-fala');
@@ -749,6 +714,8 @@
         btn.addEventListener('click', () => {
           panel.style.display = panel.style.display === 'none' || panel.style.display === '' ? 'block' : 'none';
         });
+        // Abre o painel inicialmente para facilitar ajustes de escala/rotação
+        panel.style.display = 'block';
       })();
 
       // --- Controles de transformação ---
@@ -760,6 +727,8 @@
         const posY = document.getElementById('posY');
         const posZ = document.getElementById('posZ');
         const rotY = document.getElementById('rotY');
+        const autoRotate = document.getElementById('autoRotate');
+        const btnStopRot = document.getElementById('btn-stop-rot');
 
         const setScale = (s) => { modelEl.setAttribute('scale', `${s} ${s} ${s}`); };
         const setPos = () => { modelEl.setAttribute('position', `${parseFloat(posX.value)||0} ${parseFloat(posY.value)||0} ${parseFloat(posZ.value)||0}`); };
@@ -773,47 +742,24 @@
         if (posY) posY.addEventListener('change', setPos);
         if (posZ) posZ.addEventListener('change', setPos);
         if (rotY) rotY.addEventListener('input', (e)=> setRotY(e.target.value));
-      })();
 
-      // --- Botões de Motion ---
-      (function setupMotionButtons(){
-        const modelEl = document.getElementById('modelo-personagem');
-        if (!modelEl) return;
-        const btnIdle = document.getElementById('btn-idle');
-        const btnWave = document.getElementById('btn-wave');
-        const btnStop = document.getElementById('btn-stop-motion');
-        const motion = modelEl.components['character-motion'];
-        if (btnIdle && motion && motion.playMotion) btnIdle.addEventListener('click', ()=> motion.playMotion('idle', { loop: true, fade: 0.2 }));
-        if (btnWave && motion && motion.playMotion) btnWave.addEventListener('click', ()=> motion.playMotion('wave', { loop: false, fade: 0.2 }));
-        if (btnStop && motion && motion.stopAll) btnStop.addEventListener('click', ()=> motion.stopAll());
-      })();
+        if (autoRotate) autoRotate.addEventListener('change', () => {
+          const rotComp = modelEl.components['rotating-when-visible'];
+          if (!rotComp) return;
+          if (autoRotate.checked) {
+            if (markerVisible && rotComp.start) rotComp.start();
+          } else {
+            if (rotComp.stop) rotComp.stop();
+          }
+        });
 
-      // --- Aplicar mapeamento de clips/bones/morphs ---
-      (function setupMapping(){
-        const modelEl = document.getElementById('modelo-personagem');
-        const motion = modelEl ? modelEl.components['character-motion'] : null;
-        const btnApply = document.getElementById('btn-apply-mapping');
-        if (!motion || !btnApply) return;
-        btnApply.addEventListener('click', () => {
-          const clips = {
-            idle: (document.getElementById('mapClipIdle').value || 'Idle').trim(),
-            wave: (document.getElementById('mapClipWave').value || 'Wave').trim(),
-            talk: (document.getElementById('mapClipTalk').value || 'Talk').trim()
-          };
-          const bones = {
-            jaw: (document.getElementById('mapBoneJaw').value || 'Jaw').trim(),
-            handR: (document.getElementById('mapBoneHandR').value || 'RightHand').trim()
-          };
-          const morphs = {
-            mouthOpen: (document.getElementById('mapMorphMouthOpen').value || 'MouthOpen').trim()
-          };
-          motion.setConfig({ clips, bones, morphs });
-          // Reconstruir mapas após novo config (se o modelo já estiver carregado)
-          if (motion._buildMaps) motion._buildMaps();
-          const msgEl = document.getElementById('msg');
-          if (msgEl) msgEl.textContent = '✓ Mapeamento aplicado';
+        if (btnStopRot) btnStopRot.addEventListener('click', () => {
+          const rotComp = modelEl.components['rotating-when-visible'];
+          if (rotComp && rotComp.stop) rotComp.stop();
+          if (autoRotate) autoRotate.checked = false;
         });
       })();
+
     </script>
   </body>
 </html>
