@@ -91,25 +91,47 @@
       }
       #btn-play-fala:active { transform: translateY(1px); }
 
-      /* Painel de upload (GLB + áudio opcional) */
-      #uploader {
+      /* Menu de 3 pontos (uploads + transform + motion) */
+      #menu-btn {
         position: fixed;
         right: 18px;
         top: 18px;
-        z-index: 1002;
+        z-index: 1003;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
         background: rgba(0,0,0,0.85);
+        border: 1px solid #0ff;
+        color: #0ff;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      #menu-panel {
+        position: fixed;
+        right: 18px;
+        top: 60px;
+        z-index: 1002;
+        background: rgba(0,0,0,0.92);
         border: 1px solid #0ff;
         border-radius: 10px;
         padding: 10px 12px;
         color: #0ff;
         font-size: 12px;
-        max-width: 260px;
+        min-width: 260px;
+        display: none;
       }
-      #uploader label { display: block; margin: 6px 0 2px; }
-      #uploader input[type="file"] {
-        width: 100%;
-        color: #0ff;
-      }
+      #menu-panel h4 { margin: 6px 0; }
+      #menu-panel label { display: block; margin: 6px 0 2px; }
+      #menu-panel input[type="file"],
+      #menu-panel input[type="range"],
+      #menu-panel input[type="number"],
+      #menu-panel input[type="text"] { width: 100%; }
+      #menu-panel .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      #menu-panel .actions { display: flex; gap: 8px; margin-top: 8px; }
+      #menu-panel button { background: #0a84ff; color: #fff; border: none; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
     </style>
   </head>
 
@@ -120,6 +142,7 @@
       A-Frame: <span id="af" class="warn">⟳</span><br>
       AR.js: <span id="ar" class="warn">⟳</span><br>
       Marcador: <span id="marker" class="erro">⟳ Procurando</span><br><br>
+      Áudio: <span id="audioState" class="warn">Parado</span><br>
       <small id="msg">Inicializando...</small>
     </div>
 
@@ -130,14 +153,73 @@
       <a href="pattern-marker.patt" download>Baixar marcador</a>
     </div>
 
-    <!-- Painel para envio de modelo GLB e áudio opcional -->
-    <div id="uploader" aria-label="Enviar modelo e áudio">
-      <strong>Carregar Conteúdo</strong>
+    <!-- Botão de menu (3 pontos) -->
+    <div id="menu-btn" title="Opções">⋮</div>
+    <!-- Painel de menu: uploads + transform + motion -->
+    <div id="menu-panel" aria-label="Menu de opções">
+      <h4>Uploads</h4>
       <label for="glbInput">Modelo (.glb)</label>
       <input id="glbInput" type="file" accept=".glb">
       <label for="audioInput">Áudio (opcional)</label>
       <input id="audioInput" type="file" accept="audio/*">
-      <small>O áudio toca após clicar em "Ouvir fala".</small>
+      <small>Use "Ouvir fala" para iniciar o áudio.</small>
+
+      <h4>Transformar Modelo</h4>
+      <label>Escala</label>
+      <input id="scaleSlider" type="range" min="0.1" max="2.0" step="0.01" value="0.4">
+      <div class="row">
+        <div>
+          <label>Posição X</label>
+          <input id="posX" type="number" step="0.01" value="0">
+        </div>
+        <div>
+          <label>Posição Y</label>
+          <input id="posY" type="number" step="0.01" value="0">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Posição Z</label>
+          <input id="posZ" type="number" step="0.01" value="0">
+        </div>
+        <div>
+          <label>Rotação Y</label>
+          <input id="rotY" type="range" min="0" max="360" step="1" value="0">
+        </div>
+      </div>
+
+      <h4>Motion</h4>
+      <div class="actions">
+        <button id="btn-idle" type="button">Idle</button>
+        <button id="btn-wave" type="button">Acenar</button>
+        <button id="btn-stop-motion" type="button">Parar</button>
+      </div>
+
+      <h4>Mapeamento</h4>
+      <label>Clip Idle</label>
+      <input id="mapClipIdle" type="text" placeholder="Idle">
+      <label>Clip Wave</label>
+      <input id="mapClipWave" type="text" placeholder="Wave">
+      <label>Clip Talk</label>
+      <input id="mapClipTalk" type="text" placeholder="Talk">
+      <div class="row">
+        <div>
+          <label>Bone Jaw</label>
+          <input id="mapBoneJaw" type="text" placeholder="Jaw">
+        </div>
+        <div>
+          <label>Bone RightHand</label>
+          <input id="mapBoneHandR" type="text" placeholder="RightHand">
+        </div>
+      </div>
+      <label>Morph MouthOpen</label>
+      <input id="mapMorphMouthOpen" type="text" placeholder="MouthOpen">
+      <div class="actions">
+        <button id="btn-apply-mapping" type="button">Aplicar Mapeamento</button>
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input id="lipSyncEnabled" type="checkbox"> Lip-sync
+        </label>
+      </div>
     </div>
 
     <!-- Botão de fallback para iniciar a fala caso o navegador bloqueie autoplay -->
@@ -174,6 +256,7 @@
           rotation="0 0 0"
           rotating-when-visible="speed: 15"
           character-speech="audioSelector: #fala1"
+          character-motion
         ></a-gltf-model>
       </a-marker>
 
@@ -241,6 +324,11 @@
           // A-Frame com schema selector já retorna o elemento se existir
           this.audioEl = this.data.audioSelector || document.querySelector('#fala1');
           this.isPlaying = false;
+          // WebAudio para lip-sync básico
+          this.audioCtx = null;
+          this.mediaSrc = null;
+          this.analyser = null;
+          this._lipSyncRAF = null;
 
           // Handler que será chamado em cada update do áudio para futura sincronização
           this._onTimeUpdate = (ev) => {
@@ -268,11 +356,17 @@
                   // Se a reprodução começou com sucesso, garante que o botão de fallback fique oculto
                   const btn = document.getElementById('btn-play-fala');
                   if (btn) btn.style.display = 'none';
+                  const audioState = document.getElementById('audioState');
+                  if (audioState) { audioState.textContent = 'Reproduzindo'; audioState.className = 'ok'; }
+                  // Inicia lip-sync se habilitado
+                  this._startLipSync();
                 }).catch(err => {
                   console.warn('play() falhou:', err);
                   // Mostra um botão para que o usuário permita reprodução manualmente
                   const btn = document.getElementById('btn-play-fala');
                   if (btn) btn.style.display = 'block';
+                  const audioState = document.getElementById('audioState');
+                  if (audioState) { audioState.textContent = 'Bloqueado'; audioState.className = 'warn'; }
                 });
               } else {
                 this.isPlaying = true;
@@ -281,6 +375,8 @@
               console.warn('[character-speech] erro ao tocar áudio', e);
               const btn = document.getElementById('btn-play-fala');
               if (btn) btn.style.display = 'block';
+              const audioState = document.getElementById('audioState');
+              if (audioState) { audioState.textContent = 'Erro'; audioState.className = 'erro'; }
             }
           };
 
@@ -289,6 +385,9 @@
             this.audioEl.pause();
             this.audioEl.currentTime = 0;
             this.isPlaying = false;
+            const audioState = document.getElementById('audioState');
+            if (audioState) { audioState.textContent = 'Parado'; audioState.className = 'warn'; }
+            this._stopLipSync();
           };
 
           // Placeholder público para futuras implementações de sincronização labial
@@ -296,9 +395,195 @@
             // TODO: usar audioEventOrTime.currentTime ou valor numérico para animar a boca do personagem
             // Exemplo futuro: extrair volume ou usar WebAudio API para visemes.
           };
+
+          // Lip-sync básico com WebAudio (RMS -> MouthOpen)
+          this._startLipSync = () => {
+            const lipCheck = document.getElementById('lipSyncEnabled');
+            if (!lipCheck || !lipCheck.checked) return;
+            if (!this.audioEl) return;
+            try {
+              if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+              if (this.audioCtx.state === 'suspended') {
+                // tentar retomar — navegadores exigem gesto do usuário
+                this.audioCtx.resume().catch(()=>{});
+              }
+              if (!this.mediaSrc) this.mediaSrc = this.audioCtx.createMediaElementSource(this.audioEl);
+              if (!this.analyser) {
+                this.analyser = this.audioCtx.createAnalyser();
+                this.analyser.fftSize = 512;
+                this.analyser.smoothingTimeConstant = 0.7;
+              }
+              // conectar apenas ao analyser (não ao destination para evitar duplicidade de saída)
+              this.mediaSrc.connect(this.analyser);
+              const buf = new Uint8Array(this.analyser.frequencyBinCount);
+              const motion = this.el.components['character-motion'];
+              const loop = () => {
+                this._lipSyncRAF = requestAnimationFrame(loop);
+                if (!this.analyser) return;
+                this.analyser.getByteTimeDomainData(buf);
+                // Byte time-domain: centro ~128. calcula RMS normalizado
+                let sum = 0;
+                for (let i = 0; i < buf.length; i++) {
+                  const v = (buf[i] - 128) / 128; // -1..1
+                  sum += v * v;
+                }
+                const rms = Math.sqrt(sum / buf.length); // 0..1
+                // Mapeia para 0..1 com leve ganho e clamp
+                const mouth = Math.min(1, Math.max(0, rms * 1.8));
+                if (motion && motion.setMorph) motion.setMorph('mouthOpen', mouth);
+              };
+              loop();
+            } catch (e) {
+              console.warn('Lip-sync WebAudio falhou:', e);
+            }
+          };
+
+          this._stopLipSync = () => {
+            if (this._lipSyncRAF) cancelAnimationFrame(this._lipSyncRAF);
+            this._lipSyncRAF = null;
+            const motion = this.el.components['character-motion'];
+            if (motion && motion.setMorph) motion.setMorph('mouthOpen', 0);
+          };
         },
         remove: function () {
           if (this.audioEl) this.audioEl.removeEventListener('timeupdate', this._onTimeUpdate);
+        }
+      });
+
+      /* Componente: character-motion
+         - Mixer de animações de clipes (GLB) + adapter para bones/morphs
+         - API mínima: playMotion(nome, opts), stopMotion(nome), stopAll(), setMorph(chave, valor)
+         - Config default (adaptável por nomes no GLB): clips: Idle/Wave/Talk; morphs: MouthOpen; bones: Jaw/RightHand
+      */
+      AFRAME.registerComponent('character-motion', {
+        schema: { config: { type: 'string', default: '' } },
+        init: function () {
+          this.mixer = null;
+          this.actions = {};
+          this.animations = [];
+          this.model = null;
+          this.boneMap = {};
+          this.morphTargets = [];
+
+          // Configuração mínima padrão (pode ser ajustada depois via setConfig)
+          this.config = {
+            clips: { idle: 'Idle', wave: 'Wave', talk: 'Talk' },
+            morphs: { mouthOpen: 'MouthOpen' },
+            bones: { jaw: 'Jaw', handR: 'RightHand' }
+          };
+
+          this.setConfig = (cfg) => {
+            if (!cfg) return;
+            this.config = Object.assign({}, this.config, cfg);
+          };
+
+          this._buildMaps = () => {
+            const mesh = this.model;
+            if (!mesh) return;
+            // Bones
+            this.boneMap = {};
+            Object.keys(this.config.bones).forEach(k => {
+              const name = this.config.bones[k];
+              const node = mesh.getObjectByName(name);
+              if (node) this.boneMap[k] = node;
+            });
+            // Morph targets
+            this.morphTargets = [];
+            mesh.traverse(obj => {
+              if (obj.morphTargetDictionary && obj.morphTargetInfluences) {
+                this.morphTargets.push(obj);
+              }
+            });
+          };
+
+          this.onModelLoaded = () => {
+            const mesh = this.el.getObject3D('mesh');
+            if (!mesh) return;
+            this.model = mesh;
+            // Animações embutidas
+            if (mesh.animations && mesh.animations.length) {
+              this.animations = mesh.animations;
+              this.mixer = new THREE.AnimationMixer(mesh);
+            }
+            this._buildMaps();
+          };
+          this.el.addEventListener('model-loaded', this.onModelLoaded);
+
+          this._getClipByName = (clipName) => {
+            if (!clipName || !this.animations) return null;
+            return this.animations.find(c => c && c.name === clipName) || null;
+          };
+
+          this.playMotion = (name, opts = {}) => {
+            const cfg = this.config.clips || {};
+            const clipName = cfg[name];
+            const clip = this._getClipByName(clipName);
+            if (clip && this.mixer) {
+              let action = this.actions[name];
+              if (!action) {
+                action = this.mixer.clipAction(clip);
+                this.actions[name] = action;
+              }
+              const fade = opts.fade != null ? opts.fade : 0.2;
+              const loop = opts.loop != null ? opts.loop : (name === 'idle');
+              if (!loop) { action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; }
+              action.reset();
+              // Crossfade de outras ações ativas
+              Object.keys(this.actions).forEach(k => {
+                if (k !== name) {
+                  const other = this.actions[k];
+                  if (other && other.isRunning()) other.fadeOut(fade);
+                }
+              });
+              action.fadeIn(fade).play();
+              return true;
+            }
+            // Fallback: se não houver clip, pode acionar adapter (ex.: wave -> rotacionar mão)
+            if (name === 'wave' && this.boneMap.handR) {
+              // Pequeno aceno procedural: rotaciona mão em Y por alguns ticks (simplificado)
+              // Nota: para algo mais natural, use uma curva e um temporizador dedicado
+              const hand = this.boneMap.handR;
+              hand.rotation.y += THREE.MathUtils.degToRad(15);
+              return true;
+            }
+            return false;
+          };
+
+          this.stopMotion = (name) => {
+            const action = this.actions[name];
+            if (action) { action.stop(); }
+          };
+
+          this.stopAll = () => {
+            Object.keys(this.actions).forEach(k => { const a = this.actions[k]; if (a) a.stop(); });
+          };
+
+          this.setMorph = (key, value) => {
+            // Procura o nome real do morph
+            const real = (this.config.morphs || {})[key];
+            if (!real) return;
+            this.morphTargets.forEach(obj => {
+              const dict = obj.morphTargetDictionary;
+              const idx = dict ? dict[real] : undefined;
+              if (idx != null && obj.morphTargetInfluences) {
+                obj.morphTargetInfluences[idx] = value;
+              }
+            });
+          };
+
+          this.setBoneRotation = (key, euler) => {
+            const bone = this.boneMap[key];
+            if (!bone) return;
+            bone.rotation.set(euler.x || 0, euler.y || 0, euler.z || 0);
+          };
+        },
+        tick: function (time, timeDelta) {
+          if (this.mixer) this.mixer.update(timeDelta / 1000);
+        },
+        remove: function () {
+          this.el.removeEventListener('model-loaded', this.onModelLoaded);
+          this.mixer = null;
+          this.actions = {};
         }
       });
 
@@ -329,6 +614,12 @@
           }
         }
 
+        // Inicia estado Idle (se houver) ao detectar marcador
+        if (modelEl) {
+          const motion = modelEl.components['character-motion'];
+          if (motion && motion.playMotion) motion.playMotion('idle', { loop: true, fade: 0.2 });
+        }
+
         // Após 2 segundos removemos o retângulo verde da tela e mostramos o botão "Ouvir fala"
         // Isso evita sobreposição visual e segue o pedido do usuário: permitir que o usuário pressione Play
         setTimeout(() => {
@@ -354,6 +645,8 @@
 
           const speechComp = modelEl.components['character-speech'];
           if (speechComp && speechComp.stopSpeech) speechComp.stopSpeech();
+          const motion = modelEl.components['character-motion'];
+          if (motion && motion.stopAll) motion.stopAll();
         }
         // Esconde o botão de play quando o marcador some
         const btn = document.getElementById('btn-play-fala');
@@ -446,6 +739,80 @@
             }
           });
         }
+      })();
+
+      // --- Menu de 3 pontos: toggle do painel ---
+      (function setupMenu(){
+        const btn = document.getElementById('menu-btn');
+        const panel = document.getElementById('menu-panel');
+        if (!btn || !panel) return;
+        btn.addEventListener('click', () => {
+          panel.style.display = panel.style.display === 'none' || panel.style.display === '' ? 'block' : 'none';
+        });
+      })();
+
+      // --- Controles de transformação ---
+      (function setupTransformControls(){
+        const modelEl = document.getElementById('modelo-personagem');
+        if (!modelEl) return;
+        const scaleSlider = document.getElementById('scaleSlider');
+        const posX = document.getElementById('posX');
+        const posY = document.getElementById('posY');
+        const posZ = document.getElementById('posZ');
+        const rotY = document.getElementById('rotY');
+
+        const setScale = (s) => { modelEl.setAttribute('scale', `${s} ${s} ${s}`); };
+        const setPos = () => { modelEl.setAttribute('position', `${parseFloat(posX.value)||0} ${parseFloat(posY.value)||0} ${parseFloat(posZ.value)||0}`); };
+        const setRotY = (y) => {
+          const rot = modelEl.getAttribute('rotation') || {x:0,y:0,z:0};
+          rot.y = parseFloat(y)||0; modelEl.setAttribute('rotation', rot);
+        };
+
+        if (scaleSlider) scaleSlider.addEventListener('input', (e)=> setScale(e.target.value));
+        if (posX) posX.addEventListener('change', setPos);
+        if (posY) posY.addEventListener('change', setPos);
+        if (posZ) posZ.addEventListener('change', setPos);
+        if (rotY) rotY.addEventListener('input', (e)=> setRotY(e.target.value));
+      })();
+
+      // --- Botões de Motion ---
+      (function setupMotionButtons(){
+        const modelEl = document.getElementById('modelo-personagem');
+        if (!modelEl) return;
+        const btnIdle = document.getElementById('btn-idle');
+        const btnWave = document.getElementById('btn-wave');
+        const btnStop = document.getElementById('btn-stop-motion');
+        const motion = modelEl.components['character-motion'];
+        if (btnIdle && motion && motion.playMotion) btnIdle.addEventListener('click', ()=> motion.playMotion('idle', { loop: true, fade: 0.2 }));
+        if (btnWave && motion && motion.playMotion) btnWave.addEventListener('click', ()=> motion.playMotion('wave', { loop: false, fade: 0.2 }));
+        if (btnStop && motion && motion.stopAll) btnStop.addEventListener('click', ()=> motion.stopAll());
+      })();
+
+      // --- Aplicar mapeamento de clips/bones/morphs ---
+      (function setupMapping(){
+        const modelEl = document.getElementById('modelo-personagem');
+        const motion = modelEl ? modelEl.components['character-motion'] : null;
+        const btnApply = document.getElementById('btn-apply-mapping');
+        if (!motion || !btnApply) return;
+        btnApply.addEventListener('click', () => {
+          const clips = {
+            idle: (document.getElementById('mapClipIdle').value || 'Idle').trim(),
+            wave: (document.getElementById('mapClipWave').value || 'Wave').trim(),
+            talk: (document.getElementById('mapClipTalk').value || 'Talk').trim()
+          };
+          const bones = {
+            jaw: (document.getElementById('mapBoneJaw').value || 'Jaw').trim(),
+            handR: (document.getElementById('mapBoneHandR').value || 'RightHand').trim()
+          };
+          const morphs = {
+            mouthOpen: (document.getElementById('mapMorphMouthOpen').value || 'MouthOpen').trim()
+          };
+          motion.setConfig({ clips, bones, morphs });
+          // Reconstruir mapas após novo config (se o modelo já estiver carregado)
+          if (motion._buildMaps) motion._buildMaps();
+          const msgEl = document.getElementById('msg');
+          if (msgEl) msgEl.textContent = '✓ Mapeamento aplicado';
+        });
       })();
     </script>
   </body>
