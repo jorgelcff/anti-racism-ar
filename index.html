@@ -90,6 +90,26 @@
         display: none; /* mostrado apenas se necessário */
       }
       #btn-play-fala:active { transform: translateY(1px); }
+
+      /* Painel de upload (GLB + áudio opcional) */
+      #uploader {
+        position: fixed;
+        right: 18px;
+        top: 18px;
+        z-index: 1002;
+        background: rgba(0,0,0,0.85);
+        border: 1px solid #0ff;
+        border-radius: 10px;
+        padding: 10px 12px;
+        color: #0ff;
+        font-size: 12px;
+        max-width: 260px;
+      }
+      #uploader label { display: block; margin: 6px 0 2px; }
+      #uploader input[type="file"] {
+        width: 100%;
+        color: #0ff;
+      }
     </style>
   </head>
 
@@ -108,6 +128,16 @@
     <div id="instrucoes">
       <strong>Aponte a câmera para o marcador</strong><br>
       <a href="pattern-marker.patt" download>Baixar marcador</a>
+    </div>
+
+    <!-- Painel para envio de modelo GLB e áudio opcional -->
+    <div id="uploader" aria-label="Enviar modelo e áudio">
+      <strong>Carregar Conteúdo</strong>
+      <label for="glbInput">Modelo (.glb)</label>
+      <input id="glbInput" type="file" accept=".glb">
+      <label for="audioInput">Áudio (opcional)</label>
+      <input id="audioInput" type="file" accept="audio/*">
+      <small>O áudio toca após clicar em "Ouvir fala".</small>
     </div>
 
     <!-- Botão de fallback para iniciar a fala caso o navegador bloqueie autoplay -->
@@ -361,6 +391,62 @@
           }
         });
       }
+
+      // --- Upload de GLB e Áudio (opcional) ---
+      (function setupUploads(){
+        const glbInput = document.getElementById('glbInput');
+        const audioInput = document.getElementById('audioInput');
+        const modelEl = document.getElementById('modelo-personagem');
+        const audioEl = document.getElementById('fala1');
+        const msgEl = document.getElementById('msg');
+        let currentModelBlobUrl = null;
+        let currentAudioBlobUrl = null;
+
+        if (glbInput && modelEl) {
+          glbInput.addEventListener('change', (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (!file) return;
+            const name = (file.name || '').toLowerCase();
+            if (!name.endsWith('.glb')) {
+              console.warn('Arquivo selecionado não é .glb');
+              if (msgEl) msgEl.textContent = 'Arquivo inválido. Selecione um .glb';
+              return;
+            }
+            try {
+              // Revoga URL anterior, se houver
+              if (currentModelBlobUrl) URL.revokeObjectURL(currentModelBlobUrl);
+              currentModelBlobUrl = URL.createObjectURL(file);
+              // Atualiza fonte do modelo diretamente com a Blob URL
+              modelEl.setAttribute('src', currentModelBlobUrl);
+              if (msgEl) msgEl.textContent = '✓ Modelo (.glb) carregado';
+            } catch (e) {
+              console.warn('Falha ao carregar GLB:', e);
+              if (msgEl) msgEl.textContent = 'Falha ao carregar GLB';
+            }
+          });
+        }
+
+        if (audioInput && audioEl) {
+          audioInput.addEventListener('change', (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (!file) return;
+            try {
+              if (currentAudioBlobUrl) URL.revokeObjectURL(currentAudioBlobUrl);
+              currentAudioBlobUrl = URL.createObjectURL(file);
+              audioEl.pause();
+              audioEl.src = currentAudioBlobUrl;
+              audioEl.load();
+              if (msgEl) msgEl.textContent = '✓ Áudio carregado (use "Ouvir fala")';
+              // Mostra botão para o usuário iniciar a reprodução quando quiser
+              const btn = document.getElementById('btn-play-fala');
+              if (btn) btn.style.display = 'block';
+            } catch (e) {
+              console.warn('Falha ao carregar áudio:', e);
+              if (msgEl) msgEl.textContent = 'Falha ao carregar áudio';
+            }
+          });
+        }
+      })();
     </script>
   </body>
 </html>
